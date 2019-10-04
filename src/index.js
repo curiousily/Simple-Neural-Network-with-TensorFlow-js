@@ -2,6 +2,7 @@ import "./styles.css";
 
 import * as tf from "@tensorflow/tfjs";
 import * as Plotly from "plotly.js-dist";
+import * as tfvis from "@tensorflow/tfjs-vis";
 
 const perceptron = ({ x, w, bias }) => {
   const product = tf.dot(x, w).dataSync()[0];
@@ -52,6 +53,13 @@ const renderLeakyReLU = () => {
   renderActivationFunction(xs, ys, "Leaky ReLU", "leaky-relu-cont");
 };
 
+const renderLayer = (model, layerName, container) => {
+  tfvis.show.layer(
+    document.getElementById(container),
+    model.getLayer(layerName)
+  );
+};
+
 const run = async () => {
   console.log(
     perceptron({
@@ -93,6 +101,7 @@ const run = async () => {
 
   model.add(
     tf.layers.dense({
+      name: "hidden-layer",
       inputShape: [2],
       units: 3,
       activation: "relu"
@@ -112,16 +121,27 @@ const run = async () => {
     metrics: ["accuracy"]
   });
 
+  const lossContainer = document.getElementById("loss-cont");
+
   await model.fit(X, y, {
     shuffle: true,
     epochs: 20,
-    callbacks: {
-      onEpochEnd: async (epoch, logs) => {
-        console.log("Epoch " + (epoch + 1));
-        console.log("Loss: " + logs.loss + " accuracy: " + logs.acc);
+    validationSplit: 0.1,
+    callbacks: tfvis.show.fitCallbacks(
+      lossContainer,
+      ["loss", "val_loss", "acc", "val_acc"],
+      {
+        callbacks: ["onEpochEnd"]
       }
-    }
+    )
   });
+
+  const hiddenLayer = model.getLayer("hidden-layer");
+  const [weights, biases] = hiddenLayer.getWeights(true);
+  console.log(weights.shape);
+  console.log(biases.shape);
+
+  renderLayer(model, "hidden-layer", "hidden-layer-container");
 
   const predProb = model.predict(tf.tensor2d([[0.1, 0.6]])).dataSync();
 
